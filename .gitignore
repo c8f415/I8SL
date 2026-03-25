@@ -1,0 +1,22 @@
+# binaries
+i8sl
+*.exe
+*.dll
+*.so
+*.dylib
+
+# build output
+bin/
+dist/
+
+# Go
+coverage.out
+
+# local storage
+*.db
+*.db-shm
+*.db-wal
+
+# editors
+.idea/
+.vscode/

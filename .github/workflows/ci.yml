@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify formatting
+        run: |
+          test -z "$(gofmt -l ./cmd ./docs ./internal)"
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build application
+        run: go build ./cmd/i8sl
+
+      - name: Build Docker image
+        run: docker build -f build/package/Dockerfile -t i8sl:ci .

@@ -1,0 +1,408 @@
+openapi: 3.1.0
+info:
+  title: I8SL API
+  version: 1.0.0
+  description: |
+    I8SL is a URL shortener microservice written in Go.
+
+    It provides short link generation, redirect resolution, rule inspection,
+    health checks, expiration by time or usage count, and generation rate limits.
+  license:
+    name: MIT
+externalDocs:
+  description: STFU reference project
+  url: https://github.com/pmswe/STFU
+servers:
+  - url: /
+    description: Current running I8SL instance
+tags:
+  - name: Rules
+    description: Create, inspect, delete and resolve short-link rules.
+  - name: Health
+    description: Liveness and readiness probes for operations.
+  - name: Meta
+    description: Embedded HTML docs and raw OpenAPI specification.
+paths:
+  /:
+    get:
+      tags: [Meta]
+      summary: Service landing page
+      description: Returns the minimal HTML landing page for the running service.
+      responses:
+        '200':
+          description: HTML landing page
+          content:
+            text/html:
+              schema:
+                type: string
+  /docs:
+    get:
+      tags: [Meta]
+      summary: Scalar API reference page
+      description: Returns the embedded Scalar API docs UI for the current service instance.
+      responses:
+        '200':
+          description: Scalar HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+  /openapi.yaml:
+    get:
+      tags: [Meta]
+      summary: Raw OpenAPI specification
+      description: Returns the OpenAPI document served by the application.
+      responses:
+        '200':
+          description: OpenAPI YAML document
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /api/v1/rules:
+    post:
+      tags: [Rules]
+      summary: Create a short rule
+      description: Creates a redirect rule from a JSON payload.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuleRequest'
+            examples:
+              ttl-and-usage:
+                summary: Time-limited and usage-limited link
+                value:
+                  url: https://example.com/articles/go-url-shortener
+                  ttl_seconds: 3600
+                  max_usages: 25
+              custom-alias:
+                summary: Human-readable alias
+                value:
+                  url: https://example.com/releases/march
+                  alias: march24
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+        '400':
+          description: Invalid payload or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '409':
+          description: Alias already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '429':
+          description: Generation rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+  /api/v1/generate:
+    get:
+      tags: [Rules]
+      summary: Generate a short rule from query params
+      description: STFU-style query endpoint that mirrors rule creation through query parameters.
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Absolute target URL.
+        - in: query
+          name: alias
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9]{4,32}$'
+          description: Optional custom short code.
+        - in: query
+          name: ttl_seconds
+          schema:
+            type: integer
+            minimum: 0
+          description: Expire the rule after N seconds. Use `0` or omit to disable TTL expiration.
+        - in: query
+          name: max_usages
+          schema:
+            type: integer
+            minimum: 0
+          description: Expire the rule after N successful redirects. Use `0` or omit to disable usage expiration.
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+        '400':
+          description: Invalid request or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '409':
+          description: Alias already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '429':
+          description: Generation rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+  /api/v1/rules/{code}:
+    get:
+      tags: [Rules]
+      summary: Get rule metadata
+      parameters:
+        - $ref: '#/components/parameters/RuleCode'
+      responses:
+        '200':
+          description: Rule found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuleResponse'
+        '400':
+          description: Invalid rule code format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+    delete:
+      tags: [Rules]
+      summary: Delete a rule
+      parameters:
+        - $ref: '#/components/parameters/RuleCode'
+      responses:
+        '204':
+          description: Rule deleted
+        '400':
+          description: Invalid rule code format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+  /r/{code}:
+    get:
+      tags: [Rules]
+      summary: Resolve a short rule
+      description: Redirects to the stored target URL when the rule is active.
+      parameters:
+        - $ref: '#/components/parameters/RuleCode'
+      responses:
+        '302':
+          description: Redirect to target URL
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+        '400':
+          description: Invalid rule code format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '410':
+          description: Rule expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                service: I8SL
+                time: '2026-03-25T11:20:00Z'
+                checks:
+                  process: alive
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                service: I8SL
+                time: '2026-03-25T11:20:00Z'
+                checks:
+                  store: reachable
+        '503':
+          description: Backing store is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: degraded
+                service: I8SL
+                time: '2026-03-25T11:20:00Z'
+                checks:
+                  store: connection failed
+components:
+  parameters:
+    RuleCode:
+      in: path
+      name: code
+      required: true
+      description: Short rule code or custom alias.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9]{4,32}$'
+  schemas:
+    CreateRuleRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Absolute target URL.
+        alias:
+          type: string
+          pattern: '^[A-Za-z0-9]{4,32}$'
+          description: Optional custom short code.
+        ttl_seconds:
+          type: integer
+          minimum: 0
+          description: Expire the rule after N seconds. Use `0` or omit to disable TTL expiration.
+        max_usages:
+          type: integer
+          minimum: 0
+          description: Expire the rule after N successful redirects. Use `0` or omit to disable usage expiration.
+    RuleResponse:
+      type: object
+      required: [code, short_url, url, created_at, used_count, is_expired]
+      properties:
+        code:
+          type: string
+        short_url:
+          type: string
+          format: uri
+        url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        max_usages:
+          type: integer
+          nullable: true
+        used_count:
+          type: integer
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_expired:
+          type: boolean
+        expired_reason:
+          type: string
+          enum: [ttl, max_usages]
+          nullable: true
+    ProblemResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    HealthResponse:
+      type: object
+      required: [status, service, time]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        service:
+          type: string
+        time:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          additionalProperties:
+            type: string
