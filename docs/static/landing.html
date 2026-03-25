@@ -25,6 +25,37 @@
       font-weight: 600;
     }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .title-row h1 {
+      margin: 0;
+    }
+
+    .source-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #4b5563;
+      font-size: 14px;
+    }
+
+    .version-tag {
+      color: #4b5563;
+      font-size: 14px;
+    }
+
+    .source-link img {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+    }
+
     p {
       margin: 0 0 16px;
     }
@@ -85,7 +116,6 @@
 
     .stack strong {
       display: block;
-      margin-bottom: 4px;
       font-size: 14px;
     }
 
@@ -93,11 +123,28 @@
       color: #4b5563;
       font-size: 14px;
     }
+
+    .stack-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .stack-icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+    }
   </style>
 </head>
 <body>
   <main>
-    <h1>I8SL</h1>
+    <div class="title-row">
+      <h1>I8SL</h1>
+      <span class="version-tag">v1.1</span>
+      <a class="source-link" href="https://github.com/c8f415/I8SL" target="_blank" rel="noreferrer"><img src="https://cdn.simpleicons.org/github/181717" alt="">source code</a>
+    </div>
     <p class="muted">URL-shortener inspired by <a href="https://github.com/pmswe/STFU" target="_blank" rel="noreferrer">STFU</a>.</p>
       <div class="box">
     <p>I8SL creates short links, redirects by <code>/r/{code}</code>, exposes rule metadata, supports expiration by time or usage limit, and rate-limits generation requests.</p>
@@ -108,24 +155,32 @@
     <h2>Tech Stack</h2>
     <ul class="stack">
       <li>
-        <strong>Go</strong>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/go/00ADD8" alt=""><strong>Go</strong></div>
         <span>Application language</span>
       </li>
       <li>
-        <strong>Slog</strong>
-        <span>Structured logging</span>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/openapiinitiative/6BA539" alt=""><strong>Scalar / OpenAPI</strong></div>
+        <span>API docs and schema</span>
       </li>
       <li>
-        <strong>Scalar</strong>
-        <span>API reference UI</span>
-      </li>
-      <li>
-        <strong>Docker</strong>
-        <span>Container packaging</span>
-      </li>
-      <li>
-        <strong>PostgreSQL</strong>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/postgresql/4169E1" alt=""><strong>PostgreSQL</strong></div>
         <span>Primary data store</span>
+      </li>
+      <li>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/redis/FF4438" alt=""><strong>Redis</strong></div>
+        <span>Distributed rate limiting</span>
+      </li>
+      <li>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/prometheus/E6522C" alt=""><strong>Prometheus</strong></div>
+        <span>Metrics scraping</span>
+      </li>
+      <li>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/opentelemetry/000000" alt=""><strong>OpenTelemetry</strong></div>
+        <span>Tracing and telemetry</span>
+      </li>
+      <li>
+        <div class="stack-head"><img class="stack-icon" src="https://cdn.simpleicons.org/docker/2496ED" alt=""><strong>Docker</strong></div>
+        <span>Container packaging</span>
       </li>
     </ul>
   </main>

@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: i8sl
+    static_configs:
+      - targets: ["i8sl:8080"]
+    metrics_path: /metrics

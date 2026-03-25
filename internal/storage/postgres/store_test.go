@@ -202,3 +202,31 @@ func TestResolveRuleReturnsExpired(t *testing.T) {
 		t.Fatalf("sql expectations: %v", err)
 	}
 }
+
+func TestDeleteExpired(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	store := &Store{db: db}
+	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectExec(`DELETE FROM rules`).
+		WithArgs(now).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+
+	deleted, err := store.DeleteExpired(context.Background(), now)
+	if err != nil {
+		t.Fatalf("delete expired: %v", err)
+	}
+
+	if deleted != 3 {
+		t.Fatalf("expected 3 deleted rows, got %d", deleted)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations: %v", err)
+	}
+}

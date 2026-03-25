@@ -4,12 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"i8sl/internal/code"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var (
@@ -64,14 +69,16 @@ type Store interface {
 	CreateRule(context.Context, Rule) (Rule, error)
 	GetRule(context.Context, string) (Rule, error)
 	DeleteRule(context.Context, string) error
+	DeleteExpired(context.Context, time.Time) (int64, error)
 	ResolveRule(context.Context, string, time.Time) (Rule, error)
 }
 
 type Service struct {
-	store     Store
-	generator code.Generator
-	baseURL   string
-	now       func() time.Time
+	store                Store
+	generator            code.Generator
+	baseURL              string
+	rejectPrivateTargets bool
+	now                  func() time.Time
 }
 
 type Option func(*Service)
@@ -79,6 +86,12 @@ type Option func(*Service)
 func WithNow(now func() time.Time) Option {
 	return func(s *Service) {
 		s.now = now
+	}
+}
+
+func WithPrivateTargetRejection(enabled bool) Option {
+	return func(s *Service) {
+		s.rejectPrivateTargets = enabled
 	}
 }
 
@@ -104,28 +117,61 @@ func (s *Service) Now() time.Time {
 }
 
 func (s *Service) Ping(ctx context.Context) error {
+	ctx, span := otel.Tracer("i8sl/shortener").Start(ctx, "service.ping")
+	defer span.End()
+
 	return s.store.Ping(ctx)
 }
 
+func (s *Service) DeleteExpired(ctx context.Context) (int64, error) {
+	ctx, span := otel.Tracer("i8sl/shortener").Start(ctx, "service.delete_expired")
+	defer span.End()
+
+	deleted, err := s.store.DeleteExpired(ctx, s.Now())
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "delete expired failed")
+		return 0, err
+	}
+
+	span.SetAttributes(attribute.Int64("rules.deleted", deleted))
+	return deleted, nil
+}
+
 func (s *Service) CreateRule(ctx context.Context, input CreateInput) (Rule, error) {
+	ctx, span := otel.Tracer("i8sl/shortener").Start(ctx, "service.create_rule")
+	defer span.End()
+	span.SetAttributes(
+		attribute.Bool("rule.has_alias", strings.TrimSpace(input.Alias) != ""),
+		attribute.Int64("rule.ttl_seconds", input.TTLSeconds),
+		attribute.Int64("rule.max_usages", input.MaxUsages),
+	)
+
 	now := s.Now()
 	rule, err := s.ruleFromInput(input, now)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid create input")
 		return Rule{}, err
 	}
 
 	if rule.Code != "" {
 		created, err := s.store.CreateRule(ctx, rule)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "create rule failed")
 			return Rule{}, err
 		}
 
+		span.SetAttributes(attribute.String("rule.code", created.Code))
 		return created, nil
 	}
 
 	for range 10 {
 		code, err := s.generator.Generate()
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "generate code failed")
 			return Rule{}, err
 		}
 
@@ -136,44 +182,88 @@ func (s *Service) CreateRule(ctx context.Context, input CreateInput) (Rule, erro
 		}
 
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "create generated rule failed")
 			return Rule{}, err
 		}
 
+		span.SetAttributes(attribute.String("rule.code", created.Code))
 		return created, nil
 	}
 
-	return Rule{}, fmt.Errorf("could not generate a unique short code")
+	err = fmt.Errorf("could not generate a unique short code")
+	span.RecordError(err)
+	span.SetStatus(codes.Error, "code collision exhaustion")
+	return Rule{}, err
 }
 
 func (s *Service) GetRule(ctx context.Context, code string) (Rule, error) {
+	ctx, span := otel.Tracer("i8sl/shortener").Start(ctx, "service.get_rule")
+	defer span.End()
+
 	code, err := validateCode(code)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid code")
+		return Rule{}, err
+	}
+	span.SetAttributes(attribute.String("rule.code", code))
+
+	rule, err := s.store.GetRule(ctx, code)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get rule failed")
 		return Rule{}, err
 	}
 
-	return s.store.GetRule(ctx, code)
+	return rule, nil
 }
 
 func (s *Service) DeleteRule(ctx context.Context, code string) error {
+	ctx, span := otel.Tracer("i8sl/shortener").Start(ctx, "service.delete_rule")
+	defer span.End()
+
 	code, err := validateCode(code)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid code")
 		return err
 	}
+	span.SetAttributes(attribute.String("rule.code", code))
 
-	return s.store.DeleteRule(ctx, code)
+	err = s.store.DeleteRule(ctx, code)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "delete rule failed")
+	}
+
+	return err
 }
 
 func (s *Service) ResolveRule(ctx context.Context, code string) (Rule, error) {
+	ctx, span := otel.Tracer("i8sl/shortener").Start(ctx, "service.resolve_rule")
+	defer span.End()
+
 	code, err := validateCode(code)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid code")
+		return Rule{}, err
+	}
+	span.SetAttributes(attribute.String("rule.code", code))
+
+	rule, err := s.store.ResolveRule(ctx, code, s.Now())
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "resolve rule failed")
 		return Rule{}, err
 	}
 
-	return s.store.ResolveRule(ctx, code, s.Now())
+	return rule, nil
 }
 
 func (s *Service) ruleFromInput(input CreateInput, now time.Time) (Rule, error) {
-	target, err := validateTargetURL(input.URL)
+	target, err := validateTargetURL(input.URL, s.rejectPrivateTargets)
 	if err != nil {
 		return Rule{}, err
 	}
@@ -212,7 +302,7 @@ func (s *Service) ruleFromInput(input CreateInput, now time.Time) (Rule, error) 
 	}, nil
 }
 
-func validateTargetURL(raw string) (*url.URL, error) {
+func validateTargetURL(raw string, rejectPrivateTargets bool) (*url.URL, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, &ValidationError{Field: "url", Message: "is required"}
@@ -229,10 +319,38 @@ func validateTargetURL(raw string) (*url.URL, error) {
 
 	switch parsed.Scheme {
 	case "http", "https":
+		if rejectPrivateTargets {
+			if err := validatePublicTarget(parsed); err != nil {
+				return nil, err
+			}
+		}
+
 		return parsed, nil
 	default:
 		return nil, &ValidationError{Field: "url", Message: "only http and https URLs are supported"}
 	}
+}
+
+func validatePublicTarget(target *url.URL) error {
+	hostname := strings.TrimSpace(strings.ToLower(target.Hostname()))
+	if hostname == "" {
+		return &ValidationError{Field: "url", Message: "must include a hostname"}
+	}
+
+	if hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || strings.HasSuffix(hostname, ".local") {
+		return &ValidationError{Field: "url", Message: "private and local targets are not allowed"}
+	}
+
+	ip := net.ParseIP(hostname)
+	if ip == nil {
+		return nil
+	}
+
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalMulticast() || ip.IsLinkLocalUnicast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return &ValidationError{Field: "url", Message: "private and local targets are not allowed"}
+	}
+
+	return nil
 }
 
 func normalizeAlias(raw string) (string, error) {

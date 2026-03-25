@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: I8SL API
-  version: 1.0.0
+  version: '1.1.0'
   description: |
     I8SL is a URL shortener microservice written in Go.
 
@@ -20,6 +20,8 @@ tags:
     description: Create, inspect, delete and resolve short-link rules.
   - name: Health
     description: Liveness and readiness probes for operations.
+  - name: Observability
+    description: Metrics and runtime observability endpoints.
   - name: Meta
     description: Embedded HTML docs and raw OpenAPI specification.
 paths:
@@ -57,6 +59,18 @@ paths:
           description: OpenAPI YAML document
           content:
             application/yaml:
+              schema:
+                type: string
+  /metrics:
+    get:
+      tags: [Observability]
+      summary: Prometheus metrics endpoint
+      description: Returns Prometheus-compatible runtime and application metrics.
+      responses:
+        '200':
+          description: Metrics payload
+          content:
+            text/plain:
               schema:
                 type: string
   /api/v1/rules:
@@ -103,6 +117,12 @@ paths:
                 $ref: '#/components/schemas/ProblemResponse'
         '429':
           description: Generation rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        '503':
+          description: Rate limiter backend is unavailable
           content:
             application/json:
               schema:
@@ -169,6 +189,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProblemResponse'
+        '503':
+          description: Rate limiter backend is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
         '500':
           description: Internal server error
           content:
@@ -209,11 +235,20 @@ paths:
     delete:
       tags: [Rules]
       summary: Delete a rule
+      description: Deletes a rule. When `I8SL_ADMIN_TOKEN` is configured, this endpoint requires admin authentication.
+      security:
+        - AdminToken: []
       parameters:
         - $ref: '#/components/parameters/RuleCode'
       responses:
         '204':
           description: Rule deleted
+        '401':
+          description: Admin token is required or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
         '400':
           description: Invalid rule code format
           content:
@@ -285,6 +320,10 @@ paths:
               example:
                 status: ok
                 service: I8SL
+                environment: production
+                version: dev
+                commit: none
+                build_time: unknown
                 time: '2026-03-25T11:20:00Z'
                 checks:
                   process: alive
@@ -302,9 +341,14 @@ paths:
               example:
                 status: ok
                 service: I8SL
+                environment: production
+                version: dev
+                commit: none
+                build_time: unknown
                 time: '2026-03-25T11:20:00Z'
                 checks:
                   store: reachable
+                  rate_limiter: reachable
         '503':
           description: Backing store is unavailable
           content:
@@ -314,10 +358,20 @@ paths:
               example:
                 status: degraded
                 service: I8SL
+                environment: production
+                version: dev
+                commit: none
+                build_time: unknown
                 time: '2026-03-25T11:20:00Z'
                 checks:
                   store: connection failed
 components:
+  securitySchemes:
+    AdminToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Optional admin bearer token used for destructive operations like rule deletion.
   parameters:
     RuleCode:
       in: path
@@ -392,12 +446,20 @@ components:
           type: string
     HealthResponse:
       type: object
-      required: [status, service, time]
+      required: [status, service, environment, version, commit, build_time, time]
       properties:
         status:
           type: string
           enum: [ok, degraded]
         service:
+          type: string
+        environment:
+          type: string
+        version:
+          type: string
+        commit:
+          type: string
+        build_time:
           type: string
         time:
           type: string

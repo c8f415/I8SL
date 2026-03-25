@@ -1,5 +1,8 @@
 name: ci
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches: [main, master]
@@ -22,8 +25,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       I8SL_TEST_POSTGRES_DSN: postgres://i8sl:i8sl@localhost:5432/i8sl?sslmode=disable
+      I8SL_TEST_REDIS_ADDR: localhost:6379
 
     steps:
       - name: Checkout
@@ -37,15 +50,26 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Run go vet
+        run: go vet ./...
+
       - name: Verify formatting
         run: |
           test -z "$(gofmt -l ./cmd ./docs ./internal)"
 
+      - name: Run race tests
+        run: go test -race ./...
+
       - name: Run tests
         run: go test -v ./...
 
+      - name: Run govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
       - name: Build application
-        run: go build ./cmd/i8sl
+        run: go build -ldflags="-X i8sl/internal/observability/buildinfo.Version=${GITHUB_SHA} -X i8sl/internal/observability/buildinfo.Commit=${GITHUB_SHA} -X i8sl/internal/observability/buildinfo.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" ./cmd/i8sl
 
       - name: Build Docker image
-        run: docker build -f build/package/Dockerfile -t i8sl:ci .
+        run: docker build -f build/package/Dockerfile --build-arg VERSION=${GITHUB_SHA} --build-arg COMMIT=${GITHUB_SHA} --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) -t i8sl:ci .

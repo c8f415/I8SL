@@ -117,6 +117,24 @@ func (s *Store) DeleteRule(ctx context.Context, code string) error {
 	return nil
 }
 
+func (s *Store) DeleteExpired(ctx context.Context, now time.Time) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM rules
+		WHERE (expires_at IS NOT NULL AND expires_at <= $1)
+		   OR (max_usages IS NOT NULL AND used_count >= max_usages)
+	`, now.UTC())
+	if err != nil {
+		return 0, fmt.Errorf("delete expired rules: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("delete expired rules rows affected: %w", err)
+	}
+
+	return rows, nil
+}
+
 func (s *Store) ResolveRule(ctx context.Context, code string, now time.Time) (shortener.Rule, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

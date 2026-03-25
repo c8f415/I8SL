@@ -5,14 +5,14 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"i8sl/docs"
+	apispec "i8sl/api"
 )
 
 func TestEmbeddedOpenAPIIsValid(t *testing.T) {
 	loader := openapi3.NewLoader()
 	loader.IsExternalRefsAllowed = true
 
-	doc, err := loader.LoadFromData(docs.OpenAPI)
+	doc, err := loader.LoadFromData(apispec.OpenAPI)
 	if err != nil {
 		t.Fatalf("load openapi document: %v", err)
 	}

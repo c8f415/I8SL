@@ -11,6 +11,7 @@ import (
 
 	"i8sl/internal/code"
 	"i8sl/internal/config"
+	"i8sl/internal/ratelimit"
 	"i8sl/internal/server"
 	"i8sl/internal/shortener"
 	"i8sl/internal/storage/postgres"
@@ -87,7 +88,7 @@ func newPostgresTestServer(t *testing.T, cfg config.Config, service *shortener.S
 		Level:     slog.LevelDebug,
 	}))
 
-	return httptest.NewServer(server.NewHandler(cfg, logger, service))
+	return httptest.NewServer(server.NewHandler(cfg, logger, service, ratelimit.NewMemory(cfg.GenerationRatePerMinute, cfg.GenerationBurst, 10*time.Minute)))
 }
 
 func readResponseBody(t *testing.T, res *http.Response) string {

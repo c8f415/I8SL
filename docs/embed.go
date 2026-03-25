@@ -8,7 +8,4 @@ var (
 
 	//go:embed static/scalar.html
 	ScalarHTML []byte
-
-	//go:embed static/openapi.yaml
-	OpenAPI []byte
 )

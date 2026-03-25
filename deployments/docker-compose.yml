@@ -23,6 +23,50 @@ services:
       - i8sl-network
     restart: unless-stopped
 
+  redis:
+    image: redis:8-alpine
+    container_name: i8sl-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - i8sl-network
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.137.0
+    container_name: i8sl-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4318:4318"
+    networks:
+      - i8sl-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.7.0
+    container_name: i8sl-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      i8sl:
+        condition: service_started
+    networks:
+      - i8sl-network
+    restart: unless-stopped
+
   i8sl:
     build:
       context: ..
@@ -31,15 +75,26 @@ services:
     ports:
       - "8080:8080"
     environment:
+      I8SL_ENV: "production"
       I8SL_HTTP_ADDR: ":8080"
       I8SL_BASE_URL: "http://localhost:8080"
       I8SL_STORAGE_DRIVER: "postgres"
       I8SL_DB_URI: "postgres://i8sl:i8sl@postgres:5432/i8sl?sslmode=disable"
+      I8SL_RATE_LIMIT_BACKEND: "redis"
+      I8SL_REDIS_ADDR: "redis:6379"
       I8SL_CODE_LENGTH: "7"
       I8SL_GENERATION_RATE_PER_MINUTE: "30"
       I8SL_GENERATION_BURST: "10"
+      I8SL_CLEANUP_INTERVAL: "30m"
+      I8SL_METRICS_PATH: "/metrics"
+      I8SL_TRACING_ENABLED: "true"
+      I8SL_OTLP_ENDPOINT: "otel-collector:4318"
+      I8SL_OTLP_INSECURE: "true"
+      I8SL_TRACE_SAMPLE_RATIO: "1"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - i8sl-network
