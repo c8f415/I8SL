@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>I8SL</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #111827;
+      background: #ffffff;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 16px 48px;
+      line-height: 1.6;
+    }
+
+    h1,
+    h2 {
+      margin: 0 0 12px;
+      font-weight: 600;
+    }
+
+    p {
+      margin: 0 0 16px;
+    }
+
+    a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      background: #f3f4f6;
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+
+    .box {
+      display: inline-block;
+      margin-bottom: 20px;
+      padding: 10px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .muted {
+      color: #4b5563;
+    }
+
+    .stack {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .stack li {
+      margin: 0;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+
+    .stack strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .stack span {
+      color: #4b5563;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>I8SL</h1>
+    <p class="muted">URL-shortener inspired by <a href="https://github.com/pmswe/STFU" target="_blank" rel="noreferrer">STFU</a>.</p>
+      <div class="box">
+    <p>I8SL creates short links, redirects by <code>/r/{code}</code>, exposes rule metadata, supports expiration by time or usage limit, and rate-limits generation requests.</p>
+
+      <a href="./">Open API docs</a> · <a href="https://github.com/c8f415/I8SL" target="_blank" rel="noreferrer">Repository</a>
+    </div>
+
+    <h2>Tech Stack</h2>
+    <ul class="stack">
+      <li>
+        <strong>Go</strong>
+        <span>Application language</span>
+      </li>
+      <li>
+        <strong>Slog</strong>
+        <span>Structured logging</span>
+      </li>
+      <li>
+        <strong>Scalar</strong>
+        <span>API reference UI</span>
+      </li>
+      <li>
+        <strong>Docker</strong>
+        <span>Container packaging</span>
+      </li>
+      <li>
+        <strong>PostgreSQL</strong>
+        <span>Primary data store</span>
+      </li>
+    </ul>
+  </main>
+</body>
+</html>

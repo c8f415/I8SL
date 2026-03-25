@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p site
           cp docs/pages/index.html site/index.html
+          cp docs/pages/landing.html site/landing.html
           cp docs/static/openapi.yaml site/openapi.yaml
           touch site/.nojekyll
 
