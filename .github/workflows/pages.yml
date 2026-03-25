@@ -33,6 +33,7 @@ jobs:
           mkdir -p site
           cp docs/pages/index.html site/index.html
           cp docs/pages/landing.html site/landing.html
+          cp docs/operations.md site/operations.md
           cp api/openapi.yaml site/openapi.yaml
           touch site/.nojekyll
 

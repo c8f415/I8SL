@@ -141,7 +141,9 @@ func (s *Store) ResolveRule(ctx context.Context, code string, now time.Time) (sh
 		return shortener.Rule{}, fmt.Errorf("begin resolve transaction: %w", err)
 	}
 
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	row := tx.QueryRowContext(ctx, `
 		SELECT code, target_url, created_at, expires_at, max_usages, used_count, last_used_at

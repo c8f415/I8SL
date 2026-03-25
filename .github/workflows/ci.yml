@@ -55,7 +55,7 @@ jobs:
 
       - name: Verify formatting
         run: |
-          test -z "$(gofmt -l ./cmd ./docs ./internal)"
+          test -z "$(gofmt -l ./api ./cmd ./docs ./internal)"
 
       - name: Run race tests
         run: go test -race ./...

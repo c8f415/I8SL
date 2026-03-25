@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func Setup(ctx context.Context, cfg config.Config) (func(context.Context) error, error) {
@@ -23,7 +23,7 @@ func Setup(ctx context.Context, cfg config.Config) (func(context.Context) error,
 	))
 
 	if !cfg.TracingEnabled {
-		otel.SetTracerProvider(trace.NewNoopTracerProvider())
+		otel.SetTracerProvider(noop.NewTracerProvider())
 		return func(context.Context) error { return nil }, nil
 	}
 
