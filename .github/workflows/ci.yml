@@ -8,6 +8,22 @@ on:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: i8sl
+          POSTGRES_USER: i8sl
+          POSTGRES_PASSWORD: i8sl
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U i8sl -d i8sl"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      I8SL_TEST_POSTGRES_DSN: postgres://i8sl:i8sl@localhost:5432/i8sl?sslmode=disable
 
     steps:
       - name: Checkout

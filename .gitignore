@@ -1,4 +1,4 @@
-# binaries
+# bin
 i8sl
 *.exe
 *.dll
@@ -16,6 +16,9 @@ coverage.out
 *.db
 *.db-shm
 *.db-wal
+*.mdf
+*.ldf
+*.ndf
 
 # editors
 .idea/

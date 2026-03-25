@@ -1,3 +1,5 @@
+name: i8sl
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -6,6 +8,9 @@ services:
       POSTGRES_DB: i8sl
       POSTGRES_USER: i8sl
       POSTGRES_PASSWORD: i8sl
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+    ports:
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +19,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+    networks:
+      - i8sl-network
     restart: unless-stopped
 
   i8sl:
@@ -34,6 +41,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - i8sl-network
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health/ready >/dev/null || exit 1"]
       interval: 10s
@@ -44,3 +53,6 @@ services:
 
 volumes:
   postgres-data:
+
+networks:
+  i8sl-network:
